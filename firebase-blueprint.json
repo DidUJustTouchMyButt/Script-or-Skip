@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "Room": {
+      "title": "Game Room",
+      "description": "A real-time game session between two players.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["waiting", "selection", "guessing", "result"],
+          "description": "Current phase of the game."
+        },
+        "players": {
+          "type": "object",
+          "description": "Map of player UIDs to their game data."
+        },
+        "currentMovie": {
+          "type": "string",
+          "description": "The movie selected by the selector."
+        },
+        "quotes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "isReal": { "type": "boolean" }
+            }
+          }
+        },
+        "lastResult": {
+          "type": "object",
+          "properties": {
+            "correct": { "type": "boolean" },
+            "realQuote": { "type": "string" }
+          }
+        },
+        "selectorId": {
+          "type": "string",
+          "description": "UID of the player picking the movie."
+        },
+        "guesserId": {
+          "type": "string",
+          "description": "UID of the player guessing the line."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["status", "players", "selectorId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Collection of active game rooms."
+    }
+  }
+}

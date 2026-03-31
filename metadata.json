@@ -1,0 +1,5 @@
+{
+  "name": "Script or Skip",
+  "description": "A 2-player movie quote guessing game where one player picks a movie and the other guesses the real script line among fakes.",
+  "requestFramePermissions": []
+}

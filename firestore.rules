@@ -1,0 +1,96 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: rooms
+// Document ID: {roomId}
+// Fields:
+//   - status: string (required, enum: ['waiting', 'selection', 'guessing', 'result'])
+//   - players: map (required, uid -> { uid, name, photoURL, score, role })
+//   - currentMovie: string (optional, max 100 chars)
+//   - quotes: list (optional, max 3 items, each text max 500 chars)
+//   - lastResult: map (optional, { correct: bool, realQuote: string })
+//   - selectorId: string (required, uid)
+//   - guesserId: string (optional, uid)
+//   - createdAt: timestamp (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isPlayerInRoom(roomData) {
+      return isAuthenticated() && request.auth.uid in roomData.players;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email == "steevreeves@gmail.com" && request.auth.token.email_verified == true); // Default admin
+    }
+
+    function isValidPlayerData(player) {
+      return player.uid is string && 
+             player.name is string && player.name.size() <= 50 &&
+             player.photoURL is string && player.photoURL.size() <= 500 &&
+             player.score is number && player.score >= 0 &&
+             player.role in ['selector', 'guesser'];
+    }
+
+    function isValidRoom(data) {
+      return data.status in ['waiting', 'selection', 'guessing', 'result'] &&
+             data.players is map &&
+             data.players.size() <= 2 &&
+             data.selectorId is string &&
+             data.createdAt is timestamp &&
+             (!('currentMovie' in data) || (data.currentMovie is string && data.currentMovie.size() <= 100)) &&
+             (!('quotes' in data) || (data.quotes is list && data.quotes.size() <= 3)) &&
+             (!('guesserId' in data) || data.guesserId is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /rooms/{roomId} {
+      // Anyone authenticated can create a room
+      allow create: if isAuthenticated() && 
+                      isValidRoom(request.resource.data) &&
+                      request.resource.data.players.size() == 1 &&
+                      request.auth.uid in request.resource.data.players &&
+                      request.resource.data.selectorId == request.auth.uid;
+      
+      // Players in the room can read it, or anyone can read a waiting room
+      // Allow read if document doesn't exist (for listeners)
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.status == 'waiting' || 
+        isPlayerInRoom(resource.data) ||
+        isAdmin()
+      );
+
+      // Players in the room can update it
+      allow update: if isAuthenticated() && (
+        // Joining a waiting room
+        (resource.data.status == 'waiting' && 
+         request.resource.data.players.size() == 2 &&
+         request.auth.uid in request.resource.data.players &&
+         !(request.auth.uid in resource.data.players)) ||
+        // Updating game state if you're already a player
+        isPlayerInRoom(resource.data) ||
+        isAdmin()
+      ) && isValidRoom(request.resource.data);
+
+      // Allow admin to delete
+      allow delete: if isAdmin();
+    }
+  }
+}
